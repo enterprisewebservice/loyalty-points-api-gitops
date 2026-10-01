@@ -1,0 +1,58 @@
+
+# Backend: the API's container image. The gateway, not the application, handles
+# keys, plans, logging and tracing; the OpenTelemetry operator injects the
+# language agent when the image is Python or Node.js (see instrumentation.yaml).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: loyalty-points-api
+  namespace: api-loyalty-points
+  labels:
+    app: loyalty-points-api
+    backstage.io/kubernetes-id: loyalty-points-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: loyalty-points-api
+  template:
+    metadata:
+      labels:
+        app: loyalty-points-api
+        backstage.io/kubernetes-id: loyalty-points-api
+      annotations:
+        governed-api/contract: loyalty-points-api-contract
+    spec:
+      containers:
+        - name: api
+          image: quay.io/kuadrant/authorino-examples:talker-api
+          ports:
+            - name: http
+              containerPort: 3000
+          env:
+            - name: PORT
+              value: "3000"
+            - name: OTEL_SERVICE_NAME
+              value: loyalty-points-api
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: loyalty-points-api
+  namespace: api-loyalty-points
+  labels:
+    app: loyalty-points-api
+    backstage.io/kubernetes-id: loyalty-points-api
+spec:
+  selector:
+    app: loyalty-points-api
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

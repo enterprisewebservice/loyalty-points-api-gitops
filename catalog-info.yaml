@@ -1,0 +1,51 @@
+# Registered in Developer Hub by the "Governed REST API" template. The Component
+# is the service; the API entity carries the OpenAPI contract (openapi.yaml in
+# this repository), which Developer Hub renders on the API's Definition tab.
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: loyalty-points-api
+  title: "Loyalty Points API"
+  description: "Points balance and recent activity for a member, for the store app and the web storefront."
+  annotations:
+    github.com/project-slug: enterprisewebservice/loyalty-points-api-gitops
+    backstage.io/source-location: url:https://github.com/enterprisewebservice/loyalty-points-api-gitops/tree/main/
+    backstage.io/kubernetes-id: loyalty-points-api
+    backstage.io/kubernetes-namespace: api-loyalty-points
+    argocd/app-name: loyalty-points-api
+  links:
+    - url: https://api-loyalty-points.apps.salamander.aimlworkbench.com/api
+      title: Endpoint on the gateway
+      icon: cloud
+    - url: https://v1-developer-hub-rhdh-test.apps.salamander.aimlworkbench.com/kuadrant/api-products
+      title: API products and key requests
+      icon: catalog
+    - url: https://github.com/enterprisewebservice/loyalty-points-api-gitops
+      title: GitOps repository (the audit trail of every change)
+      icon: github
+  tags:
+    - rest
+    - governed-api
+    - connectivity-link
+spec:
+  type: service
+  lifecycle: experimental
+  owner: user:default/deanpeterson
+  providesApis:
+    - loyalty-points-api
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: loyalty-points-api
+  title: "Loyalty Points API"
+  description: "Points balance and recent activity for a member, for the store app and the web storefront."
+  tags:
+    - rest
+    - governed-api
+spec:
+  type: openapi
+  lifecycle: experimental
+  owner: user:default/deanpeterson
+  definition:
+    $text: ./openapi.yaml

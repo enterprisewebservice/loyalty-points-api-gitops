@@ -1,0 +1,20 @@
+# Public hostname: an OpenShift Route in the gateway's namespace that terminates
+# TLS with the cluster certificate and hands the request to the gateway's
+# Service. DNS already resolves *.apps.salamander.aimlworkbench.com to the routers.
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: api-loyalty-points
+  namespace: api-demo
+  labels:
+    governed-api/name: loyalty-points
+spec:
+  host: api-loyalty-points.apps.salamander.aimlworkbench.com
+  to:
+    kind: Service
+    name: api-gateway-istio
+  port:
+    targetPort: 80
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

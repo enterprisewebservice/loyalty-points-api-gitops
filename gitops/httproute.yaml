@@ -1,0 +1,36 @@
+# The API's place on the shared gateway. The gateway itself
+# (api-demo/api-gateway) is owned by the platform
+# team and is not part of this repository: it carries the access log with the
+# consumer identity, the tracing provider and the request metrics for every API
+# attached to it.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: loyalty-points-api
+  namespace: api-loyalty-points
+  labels:
+    # the Connectivity Link Grafana dashboards join Istio request metrics to the
+    # route through these two labels (1.4 observability guide)
+    service: loyalty-points-api
+    deployment: loyalty-points-api
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: api-gateway
+      namespace: api-demo
+  hostnames:
+    - api-loyalty-points.apps.salamander.aimlworkbench.com
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /api
+      # written out in full (group, kind, weight are API defaults) so the
+      # GitOps diff stays clean
+      backendRefs:
+        - group: ""
+          kind: Service
+          name: loyalty-points-api
+          port: 80
+          weight: 1

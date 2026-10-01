@@ -1,0 +1,32 @@
+# Everything this API needs on the cluster, synced by OpenShift GitOps
+# (ApplicationSet governed-apis picks this repository up by name). The repository
+# is the audit trail: every change to the contract, the backend or the policies
+# is a commit here, reviewed before it is live.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - gitops/namespace.yaml
+  - gitops/backend.yaml
+  - gitops/httproute.yaml
+  - gitops/route.yaml
+  - gitops/authpolicy.yaml
+  - gitops/planpolicy.yaml
+  - gitops/apiproduct.yaml
+  - gitops/instrumentation.yaml
+  - gitops/dashboard.yaml
+  - gitops/dashboard-consumers.yaml
+  - gitops/dashboard-decisions.yaml
+  - gitops/dashboard-cost.yaml
+  - gitops/dashboard-posture.yaml
+  - gitops/dashboard-logs.yaml
+# The contract, mounted into the backend (the mock serves it; a real backend can
+# validate against it).
+configMapGenerator:
+  - name: loyalty-points-api-contract
+    namespace: api-loyalty-points
+    files:
+      - openapi.yaml
+generatorOptions:
+  disableNameSuffixHash: true
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"

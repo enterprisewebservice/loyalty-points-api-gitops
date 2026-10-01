@@ -1,0 +1,89 @@
+openapi: 3.0.3
+info:
+  title: Store Locator API
+  version: v1
+  description: Find stores, their opening hours and the services they offer.
+paths:
+  /api/stores:
+    get:
+      summary: List stores near a postal code
+      operationId: listStores
+      parameters:
+        - name: postalCode
+          in: query
+          required: false
+          schema:
+            type: string
+          example: M5V 3L9
+      responses:
+        '200':
+          description: Stores, nearest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Store'
+              example:
+                - id: "1021"
+                  name: Downtown Toronto
+                  address: 65 Dundas St W, Toronto ON
+                  distanceKm: 1.2
+                  openNow: true
+                  services: [pickup, geek-squad, trade-in]
+                - id: "1044"
+                  name: Mississauga Heartland
+                  address: 5955 Rodeo Dr, Mississauga ON
+                  distanceKm: 24.7
+                  openNow: true
+                  services: [pickup, appliances]
+  /api/stores/{storeId}:
+    get:
+      summary: Get one store
+      operationId: getStore
+      parameters:
+        - name: storeId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The store
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Store'
+              example:
+                id: "1021"
+                name: Downtown Toronto
+                address: 65 Dundas St W, Toronto ON
+                distanceKm: 0
+                openNow: true
+                hours: "10:00-21:00"
+                services: [pickup, geek-squad, trade-in]
+        '404':
+          description: No such store
+components:
+  schemas:
+    Store:
+      type: object
+      required: [id, name, address]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        address:
+          type: string
+        distanceKm:
+          type: number
+        openNow:
+          type: boolean
+        hours:
+          type: string
+        services:
+          type: array
+          items:
+            type: string
+

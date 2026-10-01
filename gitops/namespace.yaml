@@ -1,0 +1,53 @@
+# A namespace of its own, with a quota and default sizes set by the platform.
+# Delete the namespace and the API is gone (the Route and the dashboard go with
+# the GitOps application).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: api-loyalty-points
+  labels:
+    app.kubernetes.io/part-of: governed-apis
+    governed-api/name: loyalty-points
+    # lets HTTPRoutes in this namespace attach to the shared gateway
+    # (api-demo/api-gateway, listener allowedRoutes selector)
+    governed-api: "true"
+    # watched by the Service Mesh 3.4 control plane the gateway runs on, so the
+    # gateway can discover the backend Service
+    istio-discovery: default
+  annotations:
+    # sync order: namespace, quota and contract first, then the Instrumentation,
+    # then the backend, so the tracing agent is injected into the first pod
+    argocd.argoproj.io/sync-wave: "-2"
+    openshift.io/description: "Loyalty Points API"
+    governed-api/owner: user:default/deanpeterson
+    governed-api/created-by: user:default/deanpeterson
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: governed-api
+  namespace: api-loyalty-points
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+spec:
+  hard:
+    pods: "10"
+    requests.cpu: "2"
+    requests.memory: 4Gi
+    limits.memory: 8Gi
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: governed-api
+  namespace: api-loyalty-points
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+spec:
+  limits:
+    - type: Container
+      defaultRequest:
+        cpu: 50m
+        memory: 128Mi
+      default:
+        memory: 512Mi

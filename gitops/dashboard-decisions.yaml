@@ -1,0 +1,441 @@
+# The funnel every request goes through, from the gateway's own request metrics.
+apiVersion: perses.dev/v1alpha2
+kind: PersesDashboard
+metadata:
+  name: loyalty-points-api-decisions
+  namespace: openshift-cluster-observability-operator
+  labels:
+    governed-api/name: loyalty-points
+spec:
+  config:
+    display:
+      name: 'Loyalty Points API: policy decisions'
+      description: 'Every request as a funnel: received, key checked, plan checked, served; what the gateway stopped and why'
+    duration: 1h
+    refreshInterval: 30s
+    variables:
+    - kind: ListVariable
+      spec:
+        name: user_id
+        display:
+          name: Consumer
+          hidden: false
+        allowAllValue: true
+        allowMultiple: true
+        customAllValue: .*
+        defaultValue: $__all
+        plugin:
+          kind: PrometheusLabelValuesVariable
+          spec:
+            datasource:
+              kind: PrometheusDatasource
+              name: accelerators-thanos-querier-datasource
+            labelName: user_id
+            matchers:
+            - istio_requests_total{destination_service_namespace="api-loyalty-points", user_id!~"unknown|"}
+            - authorized_calls{limitador_namespace="api-loyalty-points/loyalty-points-api", user_id!=""}
+    - kind: ListVariable
+      spec:
+        name: plan
+        display:
+          name: Plan
+          hidden: false
+        allowAllValue: true
+        allowMultiple: true
+        customAllValue: .*
+        defaultValue: $__all
+        plugin:
+          kind: PrometheusLabelValuesVariable
+          spec:
+            datasource:
+              kind: PrometheusDatasource
+              name: accelerators-thanos-querier-datasource
+            labelName: plan
+            matchers:
+            - istio_requests_total{destination_service_namespace="api-loyalty-points", plan!~"unknown|"}
+            - authorized_calls{limitador_namespace="api-loyalty-points/loyalty-points-api", plan!=""}
+    panels:
+      received:
+        kind: Panel
+        spec:
+          display:
+            name: Received at the gateway
+          plugin:
+            kind: StatChart
+            spec:
+              calculation: last
+              format:
+                unit: decimal
+                decimalPlaces: 0
+          queries:
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  datasource:
+                    kind: PrometheusDatasource
+                    name: accelerators-thanos-querier-datasource
+                  query: sum(increase(istio_requests_total{destination_service_namespace="api-loyalty-points", user_id=~"$user_id", plan=~"$plan"}[$__range])) or vector(0)
+      authenticated:
+        kind: Panel
+        spec:
+          display:
+            name: Passed the key check
+            description: Authorino found a valid key (AuthPolicy)
+          plugin:
+            kind: StatChart
+            spec:
+              calculation: last
+              format:
+                unit: decimal
+                decimalPlaces: 0
+          queries:
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  datasource:
+                    kind: PrometheusDatasource
+                    name: accelerators-thanos-querier-datasource
+                  query: sum(increase(istio_requests_total{destination_service_namespace="api-loyalty-points", user_id=~"$user_id", plan=~"$plan", response_code!~"401|403"}[$__range])) or vector(0)
+      withinPlan:
+        kind: Panel
+        spec:
+          display:
+            name: Within the plan
+            description: Limitador counted the call inside the consumer's daily allowance (PlanPolicy)
+          plugin:
+            kind: StatChart
+            spec:
+              calculation: last
+              format:
+                unit: decimal
+                decimalPlaces: 0
+          queries:
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  datasource:
+                    kind: PrometheusDatasource
+                    name: accelerators-thanos-querier-datasource
+                  query: sum(increase(istio_requests_total{destination_service_namespace="api-loyalty-points", user_id=~"$user_id", plan=~"$plan", response_code!~"401|403|429"}[$__range])) or vector(0)
+      served:
+        kind: Panel
+        spec:
+          display:
+            name: Served by the application
+          plugin:
+            kind: StatChart
+            spec:
+              calculation: last
+              format:
+                unit: decimal
+                decimalPlaces: 0
+          queries:
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  datasource:
+                    kind: PrometheusDatasource
+                    name: accelerators-thanos-querier-datasource
+                  query: sum(increase(istio_requests_total{destination_service_namespace="api-loyalty-points", user_id=~"$user_id", plan=~"$plan", response_code=~"2.."}[$__range])) or vector(0)
+      stoppedAuth:
+        kind: Panel
+        spec:
+          display:
+            name: 'Stopped: no or bad key (401/403)'
+          plugin:
+            kind: StatChart
+            spec:
+              calculation: last
+              format:
+                unit: decimal
+                decimalPlaces: 0
+          queries:
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  datasource:
+                    kind: PrometheusDatasource
+                    name: accelerators-thanos-querier-datasource
+                  query: sum(increase(istio_requests_total{destination_service_namespace="api-loyalty-points", user_id=~"$user_id", plan=~"$plan", response_code=~"401|403"}[$__range])) or vector(0)
+      stoppedPlan:
+        kind: Panel
+        spec:
+          display:
+            name: 'Stopped: over the plan (429)'
+          plugin:
+            kind: StatChart
+            spec:
+              calculation: last
+              format:
+                unit: decimal
+                decimalPlaces: 0
+          queries:
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  datasource:
+                    kind: PrometheusDatasource
+                    name: accelerators-thanos-querier-datasource
+                  query: sum(increase(istio_requests_total{destination_service_namespace="api-loyalty-points", user_id=~"$user_id", plan=~"$plan", response_code="429"}[$__range])) or vector(0)
+      appErrors:
+        kind: Panel
+        spec:
+          display:
+            name: Application errors (5xx)
+          plugin:
+            kind: StatChart
+            spec:
+              calculation: last
+              format:
+                unit: decimal
+                decimalPlaces: 0
+          queries:
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  datasource:
+                    kind: PrometheusDatasource
+                    name: accelerators-thanos-querier-datasource
+                  query: sum(increase(istio_requests_total{destination_service_namespace="api-loyalty-points", user_id=~"$user_id", plan=~"$plan", response_code=~"5.."}[$__range])) or vector(0)
+      enforcedShare:
+        kind: Panel
+        spec:
+          display:
+            name: Share decided by the gateway
+            description: Requests that never reached the application because a policy stopped them
+          plugin:
+            kind: StatChart
+            spec:
+              calculation: last
+              format:
+                unit: percent
+                decimalPlaces: 1
+          queries:
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  datasource:
+                    kind: PrometheusDatasource
+                    name: accelerators-thanos-querier-datasource
+                  query: 100 * (sum(increase(istio_requests_total{destination_service_namespace="api-loyalty-points", user_id=~"$user_id", plan=~"$plan", response_code=~"401|403|429"}[$__range])) or vector(0)) / clamp_min(sum(increase(istio_requests_total{destination_service_namespace="api-loyalty-points", user_id=~"$user_id", plan=~"$plan"}[$__range])), 1)
+      outcomes:
+        kind: Panel
+        spec:
+          display:
+            name: Outcomes per second
+            description: 'Stacked: what happened to every request, as the gateway reported it'
+          plugin:
+            kind: TimeSeriesChart
+            spec:
+              legend:
+                position: bottom
+              yAxis:
+                format:
+                  unit: requests/sec
+              visual:
+                stack: all
+                areaOpacity: 0.6
+          queries:
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  datasource:
+                    kind: PrometheusDatasource
+                    name: accelerators-thanos-querier-datasource
+                  query: sum(rate(istio_requests_total{destination_service_namespace="api-loyalty-points", user_id=~"$user_id", plan=~"$plan", response_code=~"2.."}[5m]))
+                  seriesNameFormat: served (2xx)
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  datasource:
+                    kind: PrometheusDatasource
+                    name: accelerators-thanos-querier-datasource
+                  query: sum(rate(istio_requests_total{destination_service_namespace="api-loyalty-points", user_id=~"$user_id", plan=~"$plan", response_code=~"401|403"}[5m]))
+                  seriesNameFormat: 'stopped: key (401/403)'
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  datasource:
+                    kind: PrometheusDatasource
+                    name: accelerators-thanos-querier-datasource
+                  query: sum(rate(istio_requests_total{destination_service_namespace="api-loyalty-points", user_id=~"$user_id", plan=~"$plan", response_code="429"}[5m]))
+                  seriesNameFormat: 'stopped: plan (429)'
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  datasource:
+                    kind: PrometheusDatasource
+                    name: accelerators-thanos-querier-datasource
+                  query: sum(rate(istio_requests_total{destination_service_namespace="api-loyalty-points", user_id=~"$user_id", plan=~"$plan", response_code=~"5.."}[5m]))
+                  seriesNameFormat: application error (5xx)
+      engine:
+        kind: Panel
+        spec:
+          display:
+            name: The policy engine's own count
+            description: Limitador's counters for this API; they match the gateway's 429s
+          plugin:
+            kind: TimeSeriesChart
+            spec:
+              legend:
+                position: bottom
+              yAxis:
+                format:
+                  unit: requests/sec
+          queries:
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  datasource:
+                    kind: PrometheusDatasource
+                    name: accelerators-thanos-querier-datasource
+                  query: sum(rate(authorized_calls{limitador_namespace="api-loyalty-points/loyalty-points-api", user_id=~"$user_id", plan=~"$plan"}[5m])) or vector(0)
+                  seriesNameFormat: within plan
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  datasource:
+                    kind: PrometheusDatasource
+                    name: accelerators-thanos-querier-datasource
+                  query: sum(rate(limited_calls{limitador_namespace="api-loyalty-points/loyalty-points-api", user_id=~"$user_id", plan=~"$plan"}[5m])) or vector(0)
+                  seriesNameFormat: over plan
+      byPath:
+        kind: Panel
+        spec:
+          display:
+            name: Decisions by path (range)
+          plugin:
+            kind: BarChart
+            spec:
+              calculation: last
+              format:
+                unit: decimal
+              sort: desc
+              mode: value
+          queries:
+          - kind: TimeSeriesQuery
+            spec:
+              plugin:
+                kind: PrometheusTimeSeriesQuery
+                spec:
+                  datasource:
+                    kind: PrometheusDatasource
+                    name: accelerators-thanos-querier-datasource
+                  query: sum by (request_url_path, response_code) (increase(istio_requests_total{destination_service_namespace="api-loyalty-points", user_id=~"$user_id", plan=~"$plan"}[$__range]))
+                  seriesNameFormat: '{{request_url_path}} → {{response_code}}'
+    layouts:
+    - kind: Grid
+      spec:
+        display:
+          title: The funnel
+          collapse:
+            open: true
+        items:
+        - x: 0
+          y: 0
+          width: 6
+          height: 4
+          content:
+            $ref: '#/spec/panels/received'
+        - x: 6
+          y: 0
+          width: 6
+          height: 4
+          content:
+            $ref: '#/spec/panels/authenticated'
+        - x: 12
+          y: 0
+          width: 6
+          height: 4
+          content:
+            $ref: '#/spec/panels/withinPlan'
+        - x: 18
+          y: 0
+          width: 6
+          height: 4
+          content:
+            $ref: '#/spec/panels/served'
+    - kind: Grid
+      spec:
+        display:
+          title: Stopped at the gateway
+          collapse:
+            open: true
+        items:
+        - x: 0
+          y: 0
+          width: 6
+          height: 4
+          content:
+            $ref: '#/spec/panels/stoppedAuth'
+        - x: 6
+          y: 0
+          width: 6
+          height: 4
+          content:
+            $ref: '#/spec/panels/stoppedPlan'
+        - x: 12
+          y: 0
+          width: 6
+          height: 4
+          content:
+            $ref: '#/spec/panels/appErrors'
+        - x: 18
+          y: 0
+          width: 6
+          height: 4
+          content:
+            $ref: '#/spec/panels/enforcedShare'
+    - kind: Grid
+      spec:
+        display:
+          title: Over time
+          collapse:
+            open: true
+        items:
+        - x: 0
+          y: 0
+          width: 12
+          height: 8
+          content:
+            $ref: '#/spec/panels/outcomes'
+        - x: 12
+          y: 0
+          width: 12
+          height: 8
+          content:
+            $ref: '#/spec/panels/engine'
+        - x: 0
+          y: 8
+          width: 24
+          height: 8
+          content:
+            $ref: '#/spec/panels/byPath'
